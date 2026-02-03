@@ -6,7 +6,7 @@ export interface Apartment {
 }
 
 export const APARTMENT_DATA: Apartment[] = [
-  // --- 1군: 꿈의 상급지 (하이엔드) ---
+  // --- 1군 ---
   { id: 1, region: "서울 서초", name: "반포 자이", price: 3900000000 },
   { id: 2, region: "서울 서초", name: "아크로리버파크", price: 4300000000 },
   { id: 3, region: "서울 강남", name: "압구정 현대 7차", price: 5500000000 },
@@ -18,7 +18,7 @@ export const APARTMENT_DATA: Apartment[] = [
   { id: 9, region: "서울 송파", name: "잠실 엘스", price: 2400000000 },
   { id: 10, region: "서울 송파", name: "잠실 주공 5단지", price: 2800000000 },
 
-  // --- 2군: 마용성 (20대 워너비) ---
+  // --- 2군 ---
   { id: 11, region: "서울 마포", name: "마포 래미안 푸르지오", price: 1850000000 },
   { id: 12, region: "서울 마포", name: "마포 프레스티지 자이", price: 1950000000 },
   { id: 13, region: "서울 성동", name: "강변 건영", price: 1550000000 },
@@ -30,7 +30,7 @@ export const APARTMENT_DATA: Apartment[] = [
   { id: 19, region: "서울 용산", name: "이촌 한강맨션", price: 4200000000 },
   { id: 20, region: "서울 마포", name: "공덕 자이", price: 1650000000 },
 
-  // --- 3군: 서울 신축 및 대단지 ---
+  // --- 3군 ---
   { id: 21, region: "서울 강동", name: "고덕 그라시움", price: 1650000000 },
   { id: 22, region: "서울 강동", name: "올림픽파크 포레온", price: 1900000000 },
   { id: 23, region: "서울 양천", name: "목동 신시가지 7단지", price: 2000000000 },
