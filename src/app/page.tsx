@@ -92,7 +92,6 @@ export default function Home() {
     
     const years = remaining <= 0 ? 0 : Math.ceil(remaining / (monthly * 12));
     
-    // 🚨 AI 조언 로직 (임시: 백엔드 AI 연동 전까지 조건별 메시지 생성)
     let advice = "";
     if (years === 0) advice = "이미 목표 금액을 달성하셨네요! 지금 바로 매수 타이밍을 잡아보세요.";
     else if (years <= 5) advice = "목표가 코앞이에요! 조금만 더 절약하거나 대출 전략을 세우면 기간을 더 단축할 수 있어요.";
@@ -107,7 +106,6 @@ export default function Home() {
   return (
     <main className="max-w-md mx-auto min-h-screen bg-[#f2f4f6] shadow-lg overflow-hidden relative flex flex-col font-sans">
       
-      {/* STEP 0: 랜딩 페이지 */}
       {step === 0 && (
         <div className="flex-1 flex flex-col relative animate-fade-in">
           <div className="pt-20 px-8 pb-10 z-10">
@@ -163,7 +161,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* STEP 1~3 공통 화면 */}
       {step > 0 && (
         <>
           <header className="px-6 flex items-center h-20 bg-[#f2f4f6] sticky top-0 z-10">
@@ -187,7 +184,7 @@ export default function Home() {
                 </div>
                 <div className="space-y-4">
                   {filteredApartments.map((apt) => (
-                    <div key={apt.id} onClick={() => handleSelectApt(apt)} className={`p-5 rounded-3xl border transition-all cursor-pointer flex justify-between items-center bg-white shadow-sm active:scale-[0.98] ${selectedApt?.id === apt.id ? 'border-blue-500 ring-4 ring-blue-50' : 'border-transparent'}`}>
+                    <div key={`${apt.id}-${apt.name}`} onClick={() => handleSelectApt(apt)} className={`p-5 rounded-3xl border transition-all cursor-pointer flex justify-between items-center bg-white shadow-sm active:scale-[0.98] ${selectedApt?.id === apt.id ? 'border-blue-500 ring-4 ring-blue-50' : 'border-transparent'}`}>
                       <div>
                         <div className="text-xs text-gray-400 mb-0.5">{apt.region}</div>
                         <div className="font-bold text-gray-900">{apt.name}</div>
@@ -199,6 +196,7 @@ export default function Home() {
               </div>
             )}
             
+            {/* STEP 2: 실시간 금액 변환 로직 복구됨 */}
             {step === 2 && (
               <div className="p-6 animate-fade-in">
                 <h1 className="text-2xl font-bold text-gray-900 mb-2 tracking-tight">자산을 입력해주세요</h1>
@@ -210,6 +208,10 @@ export default function Home() {
                       <input type="number" placeholder="0" value={assets.seed} onChange={(e) => setAssets({ ...assets, seed: e.target.value })} className="w-full text-3xl font-bold text-gray-900 outline-none placeholder:text-gray-400 bg-transparent min-w-0" />
                       <span className="text-xl font-bold text-gray-900 ml-2 whitespace-nowrap flex-shrink-0">만원</span>
                     </div>
+                    {/* 🚨 실시간 금액 변환 텍스트 복구 */}
+                    <p className="text-xs text-blue-500 mt-2 font-medium min-h-[1rem]">
+                      {assets.seed ? formatKoreanCurrency(Number(assets.seed) * 10000) : ''}
+                    </p>
                   </div>
                   <div>
                     <label className="text-xs font-bold text-blue-500 block mb-3 uppercase tracking-wider">한 달 저축액</label>
@@ -217,12 +219,15 @@ export default function Home() {
                       <input type="number" placeholder="0" value={assets.saving} onChange={(e) => setAssets({ ...assets, saving: e.target.value })} className="w-full text-3xl font-bold text-gray-900 outline-none placeholder:text-gray-400 bg-transparent min-w-0" />
                       <span className="text-xl font-bold text-gray-900 ml-2 whitespace-nowrap flex-shrink-0">만원</span>
                     </div>
+                    {/* 🚨 실시간 금액 변환 텍스트 복구 */}
+                    <p className="text-xs text-blue-500 mt-2 font-medium min-h-[1rem]">
+                      {assets.saving ? formatKoreanCurrency(Number(assets.saving) * 10000) : ''}
+                    </p>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* 🚨 STEP 3: 결과 및 AI 조언 영역 복구 */}
             {step === 3 && (
               <div className="p-6 animate-fade-in flex flex-col items-center">
                 <div className="w-full bg-white rounded-[2.5rem] p-8 shadow-sm text-center mb-6">
@@ -240,7 +245,6 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* AI 조언 카드 섹션 */}
                 <div className="w-full bg-blue-600 rounded-[2rem] p-6 shadow-xl relative overflow-hidden">
                   <div className="absolute top-0 right-0 p-4 opacity-10">
                     <Lightbulb size={80} className="text-white" />
@@ -273,6 +277,7 @@ export default function Home() {
             </button>
           </div>
           
+          {/* 🚨 직접 입력 모달에서도 실시간 금액 변환 복구됨 */}
           {isModalOpen && (
             <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 animate-fade-in">
                 <div className="w-full max-w-md bg-white rounded-t-[2.5rem] p-8 animate-slide-up shadow-2xl">
@@ -291,6 +296,10 @@ export default function Home() {
                                 <input type="number" placeholder="예: 50000" className="w-full outline-none pb-2 font-bold text-xl text-gray-900 bg-transparent min-w-0 placeholder:text-gray-400" value={customInput.price} onChange={(e) => setCustomInput({...customInput, price: e.target.value})} />
                                 <span className="font-bold text-gray-900 pb-2 ml-1 whitespace-nowrap flex-shrink-0">만원</span>
                             </div>
+                            {/* 🚨 모달 내 금액 변환 텍스트 복구 */}
+                            <p className="text-xs text-blue-500 mt-2 font-medium min-h-[1rem]">
+                              {customInput.price ? formatKoreanCurrency(Number(customInput.price) * 10000) : ''}
+                            </p>
                         </div>
                     </div>
                     <button onClick={handleCustomSubmit} disabled={!customInput.name || !customInput.price} className={`w-full py-5 rounded-2xl font-bold text-lg transition-all ${customInput.name && customInput.price ? 'bg-blue-600 text-white shadow-lg active:scale-95' : 'bg-gray-100 text-gray-400'}`}>확인</button>

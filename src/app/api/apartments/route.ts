@@ -15,7 +15,6 @@ export async function GET() {
   const serviceKey = encodeURIComponent(API_KEY.trim());
   const dealYm = "202412"; // 2024년 12월 데이터
 
-  // _type=json 을 붙여서 확실하게 JSON으로 받습니다.
   const BASE_URL = "https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev";
   
   let allApartments: any[] = [];
