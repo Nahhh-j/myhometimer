@@ -4,6 +4,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { Search, ChevronLeft, Building2, TrendingUp, Wallet, Calendar, Plus, X, BarChart3, RefreshCw, Lightbulb } from 'lucide-react';
 import { Apartment, MOCK_DATA } from '@/constants/apartments';
 import { formatKoreanCurrency } from '@/utils/format';
+// 🚨 Supabase 연동
+import { supabase } from '@/utils/supabase';
 
 export default function Home() {
   const [step, setStep] = useState<0 | 1 | 2 | 3>(0); 
@@ -16,6 +18,31 @@ export default function Home() {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [customInput, setCustomInput] = useState({ name: '', price: '' });
+
+  // 🚨 [추가] 앱 시작 시 DB에서 기존 자산 정보 불러오기
+  useEffect(() => {
+    const loadUserAssets = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('user_assets')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (data && !error) {
+          setAssets({
+            seed: String(data.seed_money || ''),
+            saving: String(data.monthly_saving || '')
+          });
+          console.log("✅ DB에서 기존 데이터를 불러왔습니다.");
+        }
+      } catch (e) {
+        console.log("환영합니다! 첫 방문이시군요.");
+      }
+    };
+    loadUserAssets();
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -34,6 +61,25 @@ export default function Home() {
     };
     fetchData();
   }, []);
+
+  // 🚨 [추가] DB에 데이터 저장 함수
+  const saveToSupabase = async () => {
+    try {
+      const { error } = await supabase
+        .from('user_assets')
+        .insert([
+          {
+            seed_money: Number(assets.seed),
+            monthly_saving: Number(assets.saving),
+            target_apt_name: selectedApt?.name
+          }
+        ]);
+      if (error) throw error;
+      console.log("💾 데이터베이스 저장 성공!");
+    } catch (err: any) {
+      console.error("❌ 저장 에러:", err.message);
+    }
+  };
 
   const displayRows = useMemo(() => {
     const pool = realData.slice(0, 20);
@@ -73,11 +119,14 @@ export default function Home() {
   const goNext = () => {
     if (step === 0) setStep(1);
     else if (step === 1 && selectedApt) setStep(2);
-    else if (step === 2 && assets.seed && assets.saving) setStep(3);
+    else if (step === 2 && assets.seed && assets.saving) {
+      // 🚨 결과 보러가기 클릭 시 DB 저장
+      saveToSupabase();
+      setStep(3);
+    }
     else if (step === 3) {
       setStep(0);
       setSelectedApt(null);
-      setAssets({ seed: '', saving: '' });
       setSearchTerm('');
       setCustomInput({ name: '', price: '' });
     }
@@ -106,6 +155,7 @@ export default function Home() {
   return (
     <main className="max-w-md mx-auto min-h-screen bg-[#f2f4f6] shadow-lg overflow-hidden relative flex flex-col font-sans">
       
+      {/* STEP 0: 메인 랜딩 */}
       {step === 0 && (
         <div className="flex-1 flex flex-col relative animate-fade-in">
           <div className="pt-20 px-8 pb-10 z-10">
@@ -196,7 +246,6 @@ export default function Home() {
               </div>
             )}
             
-            {/* STEP 2: 실시간 금액 변환 로직 복구됨 */}
             {step === 2 && (
               <div className="p-6 animate-fade-in">
                 <h1 className="text-2xl font-bold text-gray-900 mb-2 tracking-tight">자산을 입력해주세요</h1>
@@ -208,7 +257,6 @@ export default function Home() {
                       <input type="number" placeholder="0" value={assets.seed} onChange={(e) => setAssets({ ...assets, seed: e.target.value })} className="w-full text-3xl font-bold text-gray-900 outline-none placeholder:text-gray-400 bg-transparent min-w-0" />
                       <span className="text-xl font-bold text-gray-900 ml-2 whitespace-nowrap flex-shrink-0">만원</span>
                     </div>
-                    {/* 🚨 실시간 금액 변환 텍스트 복구 */}
                     <p className="text-xs text-blue-500 mt-2 font-medium min-h-[1rem]">
                       {assets.seed ? formatKoreanCurrency(Number(assets.seed) * 10000) : ''}
                     </p>
@@ -219,7 +267,6 @@ export default function Home() {
                       <input type="number" placeholder="0" value={assets.saving} onChange={(e) => setAssets({ ...assets, saving: e.target.value })} className="w-full text-3xl font-bold text-gray-900 outline-none placeholder:text-gray-400 bg-transparent min-w-0" />
                       <span className="text-xl font-bold text-gray-900 ml-2 whitespace-nowrap flex-shrink-0">만원</span>
                     </div>
-                    {/* 🚨 실시간 금액 변환 텍스트 복구 */}
                     <p className="text-xs text-blue-500 mt-2 font-medium min-h-[1rem]">
                       {assets.saving ? formatKoreanCurrency(Number(assets.saving) * 10000) : ''}
                     </p>
@@ -277,7 +324,7 @@ export default function Home() {
             </button>
           </div>
           
-          {/* 🚨 직접 입력 모달에서도 실시간 금액 변환 복구됨 */}
+          {/* 직접 입력 모달 */}
           {isModalOpen && (
             <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 animate-fade-in">
                 <div className="w-full max-w-md bg-white rounded-t-[2.5rem] p-8 animate-slide-up shadow-2xl">
@@ -296,7 +343,6 @@ export default function Home() {
                                 <input type="number" placeholder="예: 50000" className="w-full outline-none pb-2 font-bold text-xl text-gray-900 bg-transparent min-w-0 placeholder:text-gray-400" value={customInput.price} onChange={(e) => setCustomInput({...customInput, price: e.target.value})} />
                                 <span className="font-bold text-gray-900 pb-2 ml-1 whitespace-nowrap flex-shrink-0">만원</span>
                             </div>
-                            {/* 🚨 모달 내 금액 변환 텍스트 복구 */}
                             <p className="text-xs text-blue-500 mt-2 font-medium min-h-[1rem]">
                               {customInput.price ? formatKoreanCurrency(Number(customInput.price) * 10000) : ''}
                             </p>
