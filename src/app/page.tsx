@@ -1,48 +1,93 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { Search, ChevronLeft, Building2, TrendingUp, Wallet, Calendar, Plus, X, BarChart3, RefreshCw, Lightbulb } from 'lucide-react';
+import { Search, ChevronLeft, Building2, TrendingUp, Wallet, Calendar, Plus, X, BarChart3, RefreshCw, Lightbulb, Loader2 } from 'lucide-react';
 import { Apartment, MOCK_DATA } from '@/constants/apartments';
 import { formatKoreanCurrency } from '@/utils/format';
-// 🚨 Supabase 연동
 import { supabase } from '@/utils/supabase';
+import { appLogin, GoogleAdMob } from '@apps-in-toss/web-framework';
 
 export default function Home() {
   const [step, setStep] = useState<0 | 1 | 2 | 3>(0); 
   const [selectedApt, setSelectedApt] = useState<Apartment | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  // 💡 정렬 상태 추가: 기본값은 '가격 높은 순'
+  const [sortBy, setSortBy] = useState<'high' | 'low' | 'recent'>('high');
   const [assets, setAssets] = useState({ seed: '', saving: '' });
   
   const [realData, setRealData] = useState<Apartment[]>(MOCK_DATA);
   const [isLoading, setIsLoading] = useState(true); 
+  const [isLoggingIn, setIsLoggingIn] = useState(false); 
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [customInput, setCustomInput] = useState({ name: '', price: '' });
 
-  // 🚨 [추가] 앱 시작 시 DB에서 기존 자산 정보 불러오기
-  useEffect(() => {
-    const loadUserAssets = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('user_assets')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
+  const [userKey, setUserKey] = useState<number | null>(null);
+  const [userName, setUserName] = useState<string>('고객');
 
-        if (data && !error) {
-          setAssets({
-            seed: String(data.seed_money || ''),
-            saving: String(data.monthly_saving || '')
-          });
-          console.log("✅ DB에서 기존 데이터를 불러왔습니다.");
-        }
-      } catch (e) {
-        console.log("환영합니다! 첫 방문이시군요.");
+  const AD_GROUP_ID = 'ait-ad-test-interstitial-id'; 
+
+  const sendTerminalLog = (status: string, message?: string) => {
+    fetch('/api/ad-log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, userName, message })
+    }).catch(() => {});
+  };
+
+  const loadAd = () => {
+    try {
+      sendTerminalLog("광고 장전 요청", "loadAppsInTossAdMob 호출됨");
+      
+      if (!GoogleAdMob.loadAppsInTossAdMob.isSupported()) {
+        sendTerminalLog("환경 체크 알림", "현재 브라우저(샌드박스)는 광고 기능을 직접 지원하지 않지만, 로직 테스트를 진행합니다.");
       }
-    };
-    loadUserAssets();
-  }, []);
+
+      GoogleAdMob.loadAppsInTossAdMob({
+        options: { adGroupId: AD_GROUP_ID },
+        onEvent: (event) => {
+          sendTerminalLog("광고 로드 이벤트 발생", `이벤트 타입: ${event.type}`);
+        },
+        onError: (error) => {
+          sendTerminalLog("광고 로드 실패 (샌드박스 환경 영향)", JSON.stringify(error));
+        },
+      });
+    } catch (error: any) {
+      sendTerminalLog("광고 로드 중 예외 발생", error.message);
+    }
+  };
+
+  const showAdAndGoResult = async () => {
+    sendTerminalLog("광고 노출 요청 시작", "showAppsInTossAdMob 호출");
+
+    if (!GoogleAdMob.showAppsInTossAdMob.isSupported()) {
+      sendTerminalLog("노출 중단 (샌드박스)", "실제 광고창 대신 로그 확인 후 바로 결과로 이동합니다.");
+      setStep(3); 
+      return;
+    }
+
+    try {
+      await GoogleAdMob.showAppsInTossAdMob({
+        options: { adGroupId: AD_GROUP_ID },
+        onEvent: (event) => {
+          sendTerminalLog("광고 노출 이벤트 발생", `이벤트 타입: ${event.type}`);
+          
+          if (event.type === 'dismissed' || event.type === 'show') {
+            sendTerminalLog("광고 과정 완료", "결과 페이지로 이동합니다.");
+            setStep(3);
+            loadAd();
+          }
+        },
+        onError: (error) => {
+          sendTerminalLog("광고 노출 실패", JSON.stringify(error));
+          setStep(3);
+        }
+      });
+    } catch (error: any) {
+      sendTerminalLog("광고 실행 중 예외 발생", "결과로 강제 이동합니다. " + error.message);
+      setStep(3);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -60,24 +105,27 @@ export default function Home() {
       }
     };
     fetchData();
+    loadAd(); 
   }, []);
 
-  // 🚨 [추가] DB에 데이터 저장 함수
   const saveToSupabase = async () => {
+    if (!userKey) return;
     try {
+      sendTerminalLog("DB 저장 시도", "Supabase에 자산 데이터 기록 중...");
       const { error } = await supabase
         .from('user_assets')
         .insert([
           {
+            toss_user_key: userKey,
             seed_money: Number(assets.seed),
             monthly_saving: Number(assets.saving),
             target_apt_name: selectedApt?.name
           }
         ]);
       if (error) throw error;
-      console.log("💾 데이터베이스 저장 성공!");
+      sendTerminalLog("DB 저장 성공!", "데이터베이스에 안전하게 저장되었습니다.");
     } catch (err: any) {
-      console.error("❌ 저장 에러:", err.message);
+      sendTerminalLog("DB 저장 에러", err.message);
     }
   };
 
@@ -91,15 +139,33 @@ export default function Home() {
     };
   }, [realData]);
 
+  // 💡 검색 필터링 + 정렬 로직 통합
   const filteredApartments = useMemo(() => {
-    return realData.filter(apt => 
-      apt.name.includes(searchTerm) || apt.region.includes(searchTerm)
-    );
-  }, [searchTerm, realData]);
+    let result = [...realData];
 
-  const handleSelectApt = (apt: Apartment) => {
-    setSelectedApt(apt);
-  };
+    if (searchTerm) {
+      const query = searchTerm.replace(/\s+/g, '').toLowerCase();
+      result = result.filter(apt => {
+        const name = apt.name.replace(/\s+/g, '').toLowerCase();
+        const region = apt.region.replace(/\s+/g, '').toLowerCase();
+        return name.includes(query) || region.includes(query);
+      });
+    }
+
+    return result.sort((a, b) => {
+      if (sortBy === 'high') return b.price - a.price; // 가격 높은 순
+      if (sortBy === 'low') return a.price - b.price;  // 가격 낮은 순
+      if (sortBy === 'recent') {
+        // 날짜 형식(예: 2024.12.01)에서 점(.)을 빼고 숫자로 비교
+        const dateA = String(a.dealDate || '').replace(/\./g, '');
+        const dateB = String(b.dealDate || '').replace(/\./g, '');
+        return dateB.localeCompare(dateA);
+      }
+      return 0;
+    });
+  }, [searchTerm, realData, sortBy]);
+
+  const handleSelectApt = (apt: Apartment) => setSelectedApt(apt);
 
   const handleCustomSubmit = () => {
     if (customInput.name && customInput.price) {
@@ -116,19 +182,57 @@ export default function Home() {
     }
   };
 
-  const goNext = () => {
-    if (step === 0) setStep(1);
-    else if (step === 1 && selectedApt) setStep(2);
+  const goNext = async () => {
+    if (step === 0) {
+      try {
+        setIsLoggingIn(true);
+        const { authorizationCode, referrer } = await appLogin();
+        const res = await fetch('/api/toss-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ authorizationCode, referrer })
+        });
+        const data = await res.json();
+        
+        if (data.success && data.userKey) {
+          setUserKey(data.userKey);
+          setUserName(data.userName || '고객');
+          
+          const { data: userData } = await supabase
+            .from('user_assets')
+            .select('*')
+            .eq('toss_user_key', data.userKey)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          if (userData) {
+            setAssets({ 
+              seed: String(userData.seed_money || ''), 
+              saving: String(userData.monthly_saving || '') 
+            });
+          }
+          setStep(1); 
+        }
+      } catch (error) {
+        console.error("로그인 에러:", error);
+      } finally {
+        setIsLoggingIn(false);
+      }
+    } 
+    else if (step === 1 && selectedApt) {
+      setStep(2);
+    } 
     else if (step === 2 && assets.seed && assets.saving) {
-      // 🚨 결과 보러가기 클릭 시 DB 저장
       saveToSupabase();
-      setStep(3);
-    }
+      showAdAndGoResult(); 
+    } 
     else if (step === 3) {
       setStep(0);
       setSelectedApt(null);
       setSearchTerm('');
       setCustomInput({ name: '', price: '' });
+      loadAd(); 
     }
   };
 
@@ -138,7 +242,6 @@ export default function Home() {
     const current = Number(assets.seed) * 10000;
     const monthly = Number(assets.saving) * 10000;
     const remaining = goal - current;
-    
     const years = remaining <= 0 ? 0 : Math.ceil(remaining / (monthly * 12));
     
     let advice = "";
@@ -166,7 +269,7 @@ export default function Home() {
               </span>
             </div>
             <h1 className="text-4xl font-extrabold text-gray-900 leading-tight mb-4 tracking-tighter">내 집 마련,<br /><span className="text-blue-600">몇 년</span> 남았을까?</h1>
-            <p className="text-gray-500 text-lg font-medium">{realData.length}대 아파트 타임라인 확인하기</p>
+            <p className="text-gray-500 text-lg font-medium">{realData.length}대 인기 아파트 타임라인</p>
           </div>
 
           <div className="flex-1 flex flex-col justify-center space-y-6 overflow-hidden pb-32">
@@ -204,44 +307,76 @@ export default function Home() {
           </div>
 
           <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[#f2f4f6] via-[#f2f4f6] to-transparent max-w-md mx-auto z-20">
-            <button onClick={goNext} className="w-full py-5 rounded-2xl font-bold text-xl bg-blue-600 text-white hover:bg-blue-700 active:scale-[0.98] transition-all shadow-xl text-center">
-              시작하기
+            <button 
+              onClick={goNext} 
+              disabled={isLoggingIn}
+              className="w-full py-5 rounded-2xl font-bold text-xl bg-blue-600 text-white hover:bg-blue-700 active:scale-[0.98] transition-all shadow-xl flex justify-center items-center disabled:bg-blue-400"
+            >
+              {isLoggingIn ? (
+                <>
+                  <Loader2 className="animate-spin mr-2" size={24} />
+                  로그인 중...
+                </>
+              ) : (
+                "시작하기"
+              )}
             </button>
           </div>
         </div>
       )}
 
+      {/* STEP 1~3 */}
       {step > 0 && (
         <>
-          <header className="px-6 flex items-center h-20 bg-[#f2f4f6] sticky top-0 z-10">
-            <button onClick={() => setStep((prev) => (prev - 1) as any)} className="text-gray-800 mr-2 p-3 hover:bg-gray-200 rounded-full transition-colors active:scale-90"><ChevronLeft size={32} /></button>
-            <div className="flex-1 text-center font-bold text-xl text-gray-900 mr-10">{step === 1 ? '목표 설정' : step === 2 ? '자산 입력' : '분석 결과'}</div>
-          </header>
-          
-          <div className="flex-1 overflow-y-auto pb-32 no-scrollbar">
+          <div className="flex-1 overflow-y-auto pt-6 pb-32 no-scrollbar">
             {step === 1 && (
               <div className="p-6 animate-fade-in">
                  <h1 className="text-2xl font-bold text-gray-900 mb-1 tracking-tight">어디에 살고 싶으세요?</h1>
-                 <p className="text-sm text-gray-400 mb-8 font-medium italic">국토부 2025년 07월 데이터 기준</p>
-                 <div className="flex gap-2 mb-6">
+                 <p className="text-sm text-gray-400 mb-6 font-medium italic">2030 인기 단지 실거래가 기준</p>
+                 
+                 <div className="flex gap-2 mb-4">
                     <div className="flex-1 bg-white p-4 rounded-2xl flex items-center text-gray-400 shadow-sm border border-transparent focus-within:border-blue-500 transition-all">
                         <Search size={20} className="mr-3" />
-                        <input placeholder="아파트 검색" className="bg-transparent outline-none w-full text-gray-800 font-medium placeholder:text-gray-400" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                        <input placeholder="아파트 또는 지역명 검색" className="bg-transparent outline-none w-full text-gray-800 font-medium placeholder:text-gray-400" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                     </div>
                     <button onClick={() => setIsModalOpen(true)} className="bg-white px-4 rounded-2xl shadow-sm border border-transparent hover:border-blue-500 text-blue-600 transition-all flex flex-col items-center justify-center min-w-[75px] active:scale-95">
                         <Plus size={18} className="mb-0.5" /> <span className="text-[10px] font-extrabold uppercase tracking-tight">직접입력</span>
                     </button>
                 </div>
+
+                {/* 💡 정렬 드롭다운 메뉴 추가 */}
+                <div className="flex justify-end mb-4">
+                  <div className="flex items-center bg-gray-200/60 px-3 py-1.5 rounded-full hover:bg-gray-200 transition-colors">
+                    <BarChart3 size={12} className="text-gray-500 mr-1.5" />
+                    <select 
+                      value={sortBy} 
+                      onChange={(e) => setSortBy(e.target.value as any)}
+                      className="bg-transparent text-[11px] font-bold text-gray-600 outline-none cursor-pointer border-none appearance-none"
+                    >
+                      <option value="high">가격 높은 순</option>
+                      <option value="low">가격 낮은 순</option>
+                      <option value="recent">최신 거래순</option>
+                    </select>
+                  </div>
+                </div>
+
                 <div className="space-y-4">
                   {filteredApartments.map((apt) => (
                     <div key={`${apt.id}-${apt.name}`} onClick={() => handleSelectApt(apt)} className={`p-5 rounded-3xl border transition-all cursor-pointer flex justify-between items-center bg-white shadow-sm active:scale-[0.98] ${selectedApt?.id === apt.id ? 'border-blue-500 ring-4 ring-blue-50' : 'border-transparent'}`}>
                       <div>
                         <div className="text-xs text-gray-400 mb-0.5">{apt.region}</div>
                         <div className="font-bold text-gray-900">{apt.name}</div>
+                        {/* 💡 거래 날짜 표시 추가 */}
+                        <div className="text-[10px] text-gray-300 mt-1">{apt.dealDate} 거래</div>
                       </div>
                       <div className="font-bold text-blue-600">{formatKoreanCurrency(apt.price)}</div>
                     </div>
                   ))}
+                  {filteredApartments.length === 0 && (
+                    <div className="text-center py-10 text-gray-400 text-sm">
+                      검색 결과가 없습니다.
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -300,7 +435,7 @@ export default function Home() {
                     <div className="bg-white/20 p-1.5 rounded-lg">
                       <Lightbulb size={18} className="text-white" />
                     </div>
-                    <span className="text-white font-bold">나희님을 위한 AI 조언</span>
+                    <span className="text-white font-bold">{userName}님을 위한 AI 조언</span>
                   </div>
                   <p className="text-white/90 text-sm leading-relaxed font-medium relative z-10">
                     {result.advice}
