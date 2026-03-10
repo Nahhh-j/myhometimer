@@ -90,6 +90,7 @@ export default function Home() {
   };
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     const fetchData = async () => {
       setIsLoading(true);
       try {
