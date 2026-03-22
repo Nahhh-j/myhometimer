@@ -11,13 +11,16 @@ export default function Home() {
   const [step, setStep] = useState<0 | 1 | 2 | 3>(0); 
   const [selectedApt, setSelectedApt] = useState<Apartment | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  // 💡 정렬 상태 추가: 기본값은 '가격 높은 순'
   const [sortBy, setSortBy] = useState<'high' | 'low' | 'recent'>('high');
   const [assets, setAssets] = useState({ seed: '', saving: '' });
   
   const [realData, setRealData] = useState<Apartment[]>(MOCK_DATA);
   const [isLoading, setIsLoading] = useState(true); 
   const [isLoggingIn, setIsLoggingIn] = useState(false); 
+  
+  // 💡 AI 조언을 저장하고 로딩 상태를 관리할 State 추가
+  const [aiAdvice, setAiAdvice] = useState<string>('');
+  const [isAiLoading, setIsAiLoading] = useState<boolean>(false);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [customInput, setCustomInput] = useState({ name: '', price: '' });
@@ -129,6 +132,34 @@ export default function Home() {
     }
   };
 
+  // 💡 AI에게 조언을 요청하는 함수 추가!
+  const fetchAiAdvice = async () => {
+    setIsAiLoading(true);
+    try {
+      const res = await fetch('/api/advice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          aptName: selectedApt?.name,
+          aptPrice: selectedApt?.price,
+          seedMoney: assets.seed,
+          monthlySaving: assets.saving
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAiAdvice(data.advice);
+      } else {
+        setAiAdvice("앗, AI 분석에 실패했어요. 🥲 잠시 후 다시 시도해 주세요.");
+      }
+    } catch (error) {
+      console.error("AI Fetch Error:", error);
+      setAiAdvice("AI 자산관리사와 연결이 끊어졌어요. 기본 조언을 참고해 주세요!");
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
   const displayRows = useMemo(() => {
     const pool = realData.slice(0, 20);
     const row1 = pool.slice(0, 10);
@@ -139,7 +170,6 @@ export default function Home() {
     };
   }, [realData]);
 
-  // 💡 검색 필터링 + 정렬 로직 통합
   const filteredApartments = useMemo(() => {
     let result = [...realData];
 
@@ -153,10 +183,9 @@ export default function Home() {
     }
 
     return result.sort((a, b) => {
-      if (sortBy === 'high') return b.price - a.price; // 가격 높은 순
-      if (sortBy === 'low') return a.price - b.price;  // 가격 낮은 순
+      if (sortBy === 'high') return b.price - a.price; 
+      if (sortBy === 'low') return a.price - b.price;  
       if (sortBy === 'recent') {
-        // 날짜 형식(예: 2024.12.01)에서 점(.)을 빼고 숫자로 비교
         const dateA = String(a.dealDate || '').replace(/\./g, '');
         const dateB = String(b.dealDate || '').replace(/\./g, '');
         return dateB.localeCompare(dateA);
@@ -184,6 +213,17 @@ export default function Home() {
 
   const goNext = async () => {
     if (step === 0) {
+      const isBrowser = typeof window !== 'undefined' && !(window as any).ReactNativeWebView;
+      const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+      if (isBrowser || isLocal) {
+        console.log("🚀 로컬/브라우저 테스트 모드: 로그인을 건너뛰고 메인으로 진입합니다.");
+        setUserKey(999999); 
+        setUserName('테스터'); 
+        setStep(1); 
+        return;
+      }
+
       try {
         setIsLoggingIn(true);
         const { authorizationCode, referrer } = await appLogin();
@@ -225,6 +265,7 @@ export default function Home() {
     } 
     else if (step === 2 && assets.seed && assets.saving) {
       saveToSupabase();
+      fetchAiAdvice(); // 💡 백그라운드에서 AI 분석 시작! (광고 보는 동안 알아서 불러옵니다)
       showAdAndGoResult(); 
     } 
     else if (step === 3) {
@@ -232,6 +273,7 @@ export default function Home() {
       setSelectedApt(null);
       setSearchTerm('');
       setCustomInput({ name: '', price: '' });
+      setAiAdvice(''); // 💡 다시하기 누를 때 이전 AI 조언 초기화
       loadAd(); 
     }
   };
@@ -244,6 +286,7 @@ export default function Home() {
     const remaining = goal - current;
     const years = remaining <= 0 ? 0 : Math.ceil(remaining / (monthly * 12));
     
+    // AI 로딩 실패 시 보여줄 기본 텍스트 백업
     let advice = "";
     if (years === 0) advice = "이미 목표 금액을 달성하셨네요! 지금 바로 매수 타이밍을 잡아보세요.";
     else if (years <= 5) advice = "목표가 코앞이에요! 조금만 더 절약하거나 대출 전략을 세우면 기간을 더 단축할 수 있어요.";
@@ -344,7 +387,6 @@ export default function Home() {
                     </button>
                 </div>
 
-                {/* 💡 정렬 드롭다운 메뉴 추가 */}
                 <div className="flex justify-end mb-4">
                   <div className="flex items-center bg-gray-200/60 px-3 py-1.5 rounded-full hover:bg-gray-200 transition-colors">
                     <BarChart3 size={12} className="text-gray-500 mr-1.5" />
@@ -366,7 +408,6 @@ export default function Home() {
                       <div>
                         <div className="text-xs text-gray-400 mb-0.5">{apt.region}</div>
                         <div className="font-bold text-gray-900">{apt.name}</div>
-                        {/* 💡 거래 날짜 표시 추가 */}
                         <div className="text-[10px] text-gray-300 mt-1">{apt.dealDate} 거래</div>
                       </div>
                       <div className="font-bold text-blue-600">{formatKoreanCurrency(apt.price)}</div>
@@ -427,7 +468,8 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="w-full bg-blue-600 rounded-[2rem] p-6 shadow-xl relative overflow-hidden">
+                {/* 💡 AI 조언이 표시되는 부분 */}
+                <div className="w-full bg-blue-600 rounded-[2rem] p-6 shadow-xl relative overflow-hidden min-h-[160px]">
                   <div className="absolute top-0 right-0 p-4 opacity-10">
                     <Lightbulb size={80} className="text-white" />
                   </div>
@@ -437,9 +479,16 @@ export default function Home() {
                     </div>
                     <span className="text-white font-bold">{userName}님을 위한 AI 조언</span>
                   </div>
-                  <p className="text-white/90 text-sm leading-relaxed font-medium relative z-10">
-                    {result.advice}
-                  </p>
+                  <div className="text-white/90 text-sm leading-relaxed font-medium relative z-10 whitespace-pre-wrap">
+                    {isAiLoading ? (
+                      <span className="flex items-center mt-4">
+                        <Loader2 className="animate-spin mr-2" size={18} /> 
+                        AI 자산관리사가 맞춤형 매수 전략을 분석하고 있어요...
+                      </span>
+                    ) : (
+                      aiAdvice || result.advice // AI 응답이 없으면 기존 백업 텍스트 표시
+                    )}
+                  </div>
                 </div>
               </div>
             )}
