@@ -1,6 +1,16 @@
 import { openai } from '@ai-sdk/openai';
 import { generateText } from 'ai';
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: corsHeaders });
+}
+
 function formatKorean(num: number) {
   if (num === 0) return '0';
   const uk = Math.floor(num / 100000000);
@@ -24,7 +34,6 @@ export async function POST(req: Request) {
     const remaining = goal - current;
     const years = remaining <= 0 ? 0 : Math.ceil(remaining / (monthly * 12));
 
-    // 🌟 핵심 추가: 소요 기간(years)에 따른 AI 뉘앙스/가이드라인 분기 처리
     let situationGuide = "";
     
     if (years === 0) {
@@ -63,13 +72,13 @@ export async function POST(req: Request) {
       `,
     });
 
-    return Response.json({ success: true, advice: text });
+    return Response.json({ success: true, advice: text }, { headers: corsHeaders });
 
   } catch (error) {
     console.error("AI API 에러 발생:", error);
     return Response.json(
       { success: false, advice: "앗, 팩폭 요정이 잠시 자리를 비웠어요. 잠시 후 다시 시도해주세요!" },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }
