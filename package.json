@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "granite dev",
     "build": "granite build",
+    "build:vercel": "next build",
     "start": "next start",
     "lint": "eslint",
     "deploy": "ait deploy"
