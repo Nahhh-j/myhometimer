@@ -39,12 +39,13 @@ export default function Home() {
   };
 
   const loadAd = () => {
+    // 💡 1. 로컬(브라우저) 환경이면 광고 장전 자체를 안 하고 함수 종료!
+    const isBrowser = typeof window !== 'undefined' && !(window as any).ReactNativeWebView;
+    if (isBrowser) return;
+
     try {
       sendTerminalLog("광고 장전 요청", "loadAppsInTossAdMob 호출됨");
-      
-      if (!GoogleAdMob.loadAppsInTossAdMob.isSupported()) {
-        sendTerminalLog("환경 체크 알림", "현재 브라우저(샌드박스)는 광고 기능을 직접 지원하지 않지만, 로직 테스트를 진행합니다.");
-      }
+      if (!GoogleAdMob.loadAppsInTossAdMob.isSupported()) return;
 
       GoogleAdMob.loadAppsInTossAdMob({
         options: { adGroupId: AD_GROUP_ID },
@@ -52,7 +53,7 @@ export default function Home() {
           sendTerminalLog("광고 로드 이벤트 발생", `이벤트 타입: ${event.type}`);
         },
         onError: (error) => {
-          sendTerminalLog("광고 로드 실패 (샌드박스 환경 영향)", JSON.stringify(error));
+          sendTerminalLog("광고 로드 실패", JSON.stringify(error));
         },
       });
     } catch (error: any) {
@@ -61,24 +62,31 @@ export default function Home() {
   };
 
   const showAdAndGoResult = async () => {
-    sendTerminalLog("광고 노출 요청 시작", "showAppsInTossAdMob 호출");
-
-    if (!GoogleAdMob.showAppsInTossAdMob.isSupported()) {
-      sendTerminalLog("노출 중단 (샌드박스)", "실제 광고창 대신 로그 확인 후 바로 결과로 이동합니다.");
+    // 💡 2. 로컬(브라우저) 환경이면 에러 내지 말고 바로 다음 3단계로 직행!
+    const isBrowser = typeof window !== 'undefined' && !(window as any).ReactNativeWebView;
+    if (isBrowser) {
+      console.log("🚀 로컬 테스트 모드: 토스 광고를 건너뛰고 결과 화면으로 직행합니다.");
       setStep(3); 
       return;
     }
 
+    sendTerminalLog("광고 노출 요청 시작", "showAppsInTossAdMob 호출");
+
     try {
+      if (!GoogleAdMob.showAppsInTossAdMob.isSupported()) {
+        sendTerminalLog("노출 중단 (샌드박스)", "실제 광고창 대신 로그 확인 후 바로 결과로 이동합니다.");
+        setStep(3); 
+        return;
+      }
+
       await GoogleAdMob.showAppsInTossAdMob({
         options: { adGroupId: AD_GROUP_ID },
         onEvent: (event) => {
           sendTerminalLog("광고 노출 이벤트 발생", `이벤트 타입: ${event.type}`);
-          
           if (event.type === 'dismissed' || event.type === 'show') {
             sendTerminalLog("광고 과정 완료", "결과 페이지로 이동합니다.");
             setStep(3);
-            loadAd();
+            loadAd(); // 다음을 위해 미리 장전
           }
         },
         onError: (error) => {
