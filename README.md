@@ -8,7 +8,7 @@
 ## Project Overview
 단순한 자산 계산기를 넘어, 사용자의 현재 자산과 목표 아파트 가격을 비교하여 **AI가 맞춤형 '팩트 폭행' 및 현실적인 솔루션을 제공**하는 서비스입니다. <br/> 데이터 기반의 시스템 설계와 직관적인 UI/UX를 통해 사용자의 목표 달성을 독려합니다.
 
-- **개발 기간:** 2026.04 ~ 
+- **개발 기간:** 2026.02 ~ 2026.03
 - **배포 주소:** [https://myhometimer.vercel.app](https://myhometimer.vercel.app) (API Server)
 - **플랫폼:** Toss Mini App (토스 앱 내 구동)
 
