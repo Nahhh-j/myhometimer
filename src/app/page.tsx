@@ -211,7 +211,7 @@ export default function Home() {
     }
   };
 
-  const goNext = async () => {
+const goNext = async () => {
     if (step === 0) {
       const isBrowser = typeof window !== 'undefined' && !(window as any).ReactNativeWebView;
       const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
@@ -252,12 +252,19 @@ export default function Home() {
               saving: String(userData.monthly_saving || '') 
             });
           }
-          setStep(1); 
+        } else {
+          // 💡 [추가] 토큰은 받았으나 유저 정보 조회가 실패한 경우
+          console.log("유저 정보 없음, 게스트로 진입합니다.");
+          setUserName('게스트');
         }
       } catch (error) {
-        console.error("로그인 에러:", error);
+        // 💡 [수정] 사용자가 로그인을 취소하거나 에러가 나도 튕기지 않고 게스트 처리
+        console.error("로그인 에러 (게스트 진입):", error);
+        setUserName('게스트');
       } finally {
         setIsLoggingIn(false);
+        // 🌟 [핵심] 성공하든 실패하든, 무조건 step 1(아파트 검색)으로 넘깁니다!
+        setStep(1); 
       }
     } 
     else if (step === 1 && selectedApt) {
@@ -265,7 +272,7 @@ export default function Home() {
     } 
     else if (step === 2 && assets.seed && assets.saving) {
       saveToSupabase();
-      fetchAiAdvice(); // 💡 백그라운드에서 AI 분석 시작! (광고 보는 동안 알아서 불러옵니다)
+      fetchAiAdvice(); // 백그라운드에서 AI 분석 시작!
       showAdAndGoResult(); 
     } 
     else if (step === 3) {
@@ -273,7 +280,7 @@ export default function Home() {
       setSelectedApt(null);
       setSearchTerm('');
       setCustomInput({ name: '', price: '' });
-      setAiAdvice(''); // 💡 다시하기 누를 때 이전 AI 조언 초기화
+      setAiAdvice(''); // 다시하기 누를 때 이전 AI 조언 초기화
       loadAd(); 
     }
   };
